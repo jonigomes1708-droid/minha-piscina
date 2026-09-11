@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1677ff">
+<title>Saldo Piscina</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#f3f7fb;color:#142033}
+header{background:linear-gradient(135deg,#1677ff,#00a9e8);color:white;padding:28px 20px 24px;border-radius:0 0 28px 28px}
+h1{margin:0;font-size:25px}.sub{opacity:.9;margin-top:5px}
+.container{max-width:620px;margin:auto;padding:16px}
+.card{background:white;border-radius:20px;padding:18px;margin-bottom:14px;box-shadow:0 4px 18px #17324d12}
+.balance{text-align:center}.balance small{color:#667085}.amount{font-size:45px;font-weight:800;margin:3px 0 12px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}.stat{background:#f5f8fc;border-radius:14px;padding:12px}.stat b{display:block;font-size:20px}.stat span{font-size:12px;color:#667085}
+.buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px}button{border:0;border-radius:15px;padding:15px;font-size:16px;font-weight:700;cursor:pointer}.primary{background:#1677ff;color:white}.secondary{background:#eaf4ff;color:#1677ff}
+input{width:100%;padding:14px;border:1px solid #d9e1ea;border-radius:12px;font-size:16px;margin:7px 0 12px}label{font-size:13px;font-weight:700;color:#475467}
+.history h2{font-size:18px;margin:0 0 10px}.row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #edf0f4}.row:last-child{border:0}.date{font-weight:650}.desc{font-size:12px;color:#667085}.plus{color:#07883f;font-weight:750}.minus{color:#d12f2f;font-weight:750}.delete{background:none;color:#98a2b3;padding:5px;font-size:18px}
+.empty{text-align:center;color:#98a2b3;padding:20px 0}
+dialog{border:0;border-radius:20px;padding:0;width:min(92%,400px);box-shadow:0 20px 60px #0003}dialog::backdrop{background:#07111dcc}.modal{padding:20px}.modal h2{margin-top:0}
+.install{font-size:12px;color:#667085;text-align:center;margin:12px 0 25px}
+</style>
+</head>
+<body>
+<header><div class="container"><h1>🏊 Saldo Piscina</h1><div class="sub">Controlo do teu cartão</div></div></header>
+<main class="container">
+<section class="card balance">
+<small>Saldo atual</small><div class="amount" id="balance">0,00 €</div>
+<div class="stats">
+<div class="stat"><b id="sessions">0</b><span>Sessões</span></div>
+<div class="stat"><b id="available">0</b><span>Sessões disponíveis</span></div>
+</div>
+</section>
+<section class="card">
+<div class="buttons"><button class="primary" onclick="openLoad()">➕ Carregar</button><button class="secondary" onclick="addSession()">🏊 Registar sessão · 2 €</button></div>
+</section>
+<section class="card">
+<label>Saldo inicial (se já tinhas dinheiro no cartão)</label>
+<input id="initial" type="number" min="0" step="0.01" placeholder="0,00" onchange="setInitial(this.value)">
+</section>
+<section class="card history"><h2>Movimentos</h2><div id="history"></div></section>
+<div class="install">Os dados ficam guardados neste telemóvel. Não precisas de internet para consultar ou registar movimentos.</div>
+</main>
+
+<dialog id="loadDialog"><div class="modal"><h2>Carregar cartão</h2><label>Valor (€)</label><input id="loadValue" type="number" min="0.01" step="0.01" placeholder="20"><div class="buttons"><button class="secondary" onclick="loadDialog.close()">Cancelar</button><button class="primary" onclick="addLoad()">Adicionar</button></div></div></dialog>
+
+<script>
+const PRICE=2;
+let data=JSON.parse(localStorage.getItem('poolData')||'{"initial":0,"moves":[]}');
+const euro=v=>Number(v).toLocaleString('pt-PT',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+function save(){localStorage.setItem('poolData',JSON.stringify(data));render()}
+function balance(){return data.initial+data.moves.reduce((s,m)=>s+(m.type==='load'?m.value:-PRICE),0)}
+function openLoad(){document.getElementById('loadValue').value='';document.getElementById('loadDialog').showModal();setTimeout(()=>document.getElementById('loadValue').focus(),100)}
+function addLoad(){let v=parseFloat(document.getElementById('loadValue').value);if(!v||v<=0)return;data.moves.unshift({type:'load',value:v,date:new Date().toISOString()});document.getElementById('loadDialog').close();save()}
+function addSession(){data.moves.unshift({type:'session',value:PRICE,date:new Date().toISOString()});save()}
+function setInitial(v){data.initial=Math.max(0,parseFloat(v)||0);save()}
+function removeMove(i){if(confirm('Apagar este movimento?')){data.moves.splice(i,1);save()}}
+function render(){
+let b=balance();document.getElementById('balance').textContent=euro(b);
+let sessions=data.moves.filter(x=>x.type==='session').length;document.getElementById('sessions').textContent=sessions;
+document.getElementById('available').textContent=Math.max(0,Math.floor(b/PRICE));
+document.getElementById('initial').value=data.initial||'';
+let h=document.getElementById('history');
+if(!data.moves.length){h.innerHTML='<div class="empty">Ainda não existem movimentos.</div>';return}
+h.innerHTML=data.moves.map((m,i)=>{
+let d=new Date(m.date).toLocaleString('pt-PT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+return `<div class="row"><div><div class="date">${m.type==='load'?'💳 Carregamento':'🏊 Sessão'}</div><div class="desc">${d}</div></div><div style="display:flex;align-items:center;gap:8px"><span class="${m.type==='load'?'plus':'minus'}">${m.type==='load'?'+':'−'}${euro(m.value)}</span><button class="delete" onclick="removeMove(${i})">×</button></div></div>`
+}).join('')
+}
+render();
+</script>
+</body>
+</html>
